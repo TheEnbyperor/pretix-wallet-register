@@ -1,0 +1,49 @@
+* {
+    box-sizing: border-box;
+}
+
+#app {
+    height: 100vh;
+    width: 100vw;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 20vh 80vh;
+    overflow: hidden;
+}
+
+.status-bar {
+    background: #222222;
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    grid-row: 1;
+}
+
+.loading-spinner {
+    position: absolute;
+    z-index: 99999999;
+    background: rgba(255, 255, 255, 0.7);
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.barkoder {
+    grid-row: 2;
+}
+
+#barkoder-container {
+    width: 100%;
+    height: 80vh;
+}
+
+#cameraPreview, #overlay, #flash-button, #zoom-button, #close-button, #cameraPicker-button {
+    z-index: unset !important;
+}
