@@ -36,6 +36,7 @@ pub enum ScanAction {
 pub struct ScanResult {
     action: ScanAction,
     wallet_pan: String,
+    wallet_public_pan: String,
     wallet_balance: String,
     wallet_currency: String,
     wallet_customer: Option<String>,
@@ -51,6 +52,11 @@ impl ScanResult {
     #[wasm_bindgen(getter)]
     pub fn wallet_pan(&self) -> JsValue {
         (&self.wallet_pan).into()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn wallet_public_pan(&self) -> JsValue {
+        (&self.wallet_public_pan).into()
     }
 
     #[wasm_bindgen(getter)]
@@ -116,9 +122,17 @@ struct PretixKey {
 #[derive(Debug, serde::Deserialize)]
 struct PretixWalletData {
     pan: String,
+    public_pan: String,
     balance: String,
     currency: String,
     customer: Option<String>,
+}
+
+#[derive(Debug, serde::Serialize)]
+struct PretixWalletCharge {
+    amount: String,
+    #[serde(skip_serializing_if="Option::is_none")]
+    descriptor: Option<String>
 }
 
 #[wasm_bindgen]
@@ -278,6 +292,7 @@ impl WalletClient {
                 Ok(ScanResult {
                     action: ScanAction::Wallet,
                     wallet_pan: wallet_data.pan,
+                    wallet_public_pan: wallet_data.public_pan,
                     wallet_balance: wallet_data.balance,
                     wallet_currency: wallet_data.currency,
                     wallet_customer: wallet_data.customer,
@@ -335,13 +350,31 @@ impl WalletClient {
         })
     }
 
-    pub fn load_pk(&mut self, issuer: &str, key_id: &str, pk: &str) -> Result<(), JsValue> {
-        self.pk_db.load_key_pem(issuer, key_id, pk)
-            .map_err(|e| e.to_string())?;
-        Ok(())
-    }
+    pub async fn charge_wallet(&mut self, pan: String, amount: String, descriptor: Option<String>) -> Result<(), JsValue> {
+        let registration = match &self.registration {
+            Some(r) => r,
+            None => return Err("Not registered".into())
+        };
 
-    pub fn debug(&self) -> String {
-        format!("{:?}", self)
+        let res = self.http_client.post(registration.url.join(&format!(
+            "/api/v1/organizers/{}/wallets/{}/charge/",
+            registration.registration.organizer,
+            pan,
+        )).unwrap())
+            .header("Authorization", format!("Device {}", registration.registration.api_token))
+            .json(&PretixWalletCharge {
+                amount,
+                descriptor,
+            })
+            .send()
+            .await
+            .map_err(|e| JsValue::from(format!("Failed to communicate with Pretix: {}", e)))?;
+        if res.status() == reqwest::StatusCode::PAYMENT_REQUIRED {
+            return Err("Insufficient balance on wallet".into())
+        }
+        res.error_for_status()
+            .map_err(|e| JsValue::from(format!("Failed to charge wallet: {}", e)))?;
+
+        Ok(())
     }
 }

@@ -4,6 +4,7 @@ import Spinner from 'react-bootstrap/Spinner';
 import * as pretixWallet from "pretix-wallet";
 import Error from './Error';
 import Notice from './Notice';
+import Wallet from './Wallet';
 import "./App.css";
 
 const BARKODER_LICENSE = "0MHXR8cuvoJT62F-vUCcqMQR74K0988ixUjSf_DnucZlrv_DJTneGfAh1avJBr72P0VecEQGK5JHDH0FmfI_Lp8PdEdFGLDlQzT_axGBusQQWRt4-vYYaAyxrCvqtGWZIVN6jhCiyvQ7fndQ7oDAwhdpufGp1KH2tYFeNfif84DE8anuMEXfTOGUjN3jfEu1";
@@ -13,6 +14,7 @@ export default function App() {
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState(null);
     const [notice, setNotice] = useState(null);
+    const [wallet, setWallet] = useState(null);
     const [clientState, setClientState] = useState(null);
     const [barkoder, setBarkoder] = useState(null);
     const [client, setClient] = useState(null);
@@ -74,13 +76,12 @@ export default function App() {
                                 msg: "This device has been successfully registered with Pretix"
                             })
                         } else if (res.action === pretixWallet.ScanAction.Wallet) {
-                            let balance = new Intl.NumberFormat(undefined, {
-                                style: "currency",
-                                currency: res.wallet_currency
-                            }).format(res.wallet_balance);
-                            setNotice({
-                                title: `Wallet ${res.wallet_pan}`,
-                                msg: `Balance: ${balance}`
+                            setWallet({
+                                pan: res.wallet_pan,
+                                public_pan: res.wallet_public_pan,
+                                balance: res.wallet_balance,
+                                currency: res.wallet_currency,
+                                customer: res.wallet_customer
                             })
                         } else {
                             barkoder.setPauseDecoding(false);
@@ -95,8 +96,10 @@ export default function App() {
     }, [barkoder, clientState]);
 
     const clearError = () => {
-        setError(null);
-        barkoder.setPauseDecoding(false);
+        if (isInitialized) {
+            setError(null);
+            barkoder.setPauseDecoding(false);
+        }
     }
 
     const clearNotice = () => {
@@ -104,21 +107,40 @@ export default function App() {
         barkoder.setPauseDecoding(false);
     }
 
+    const clearWallet = () => {
+        setWallet(null);
+        barkoder.setPauseDecoding(false);
+    }
+
+    const chargeWallet = (value, descriptor) => {
+        setIsProcessing(true);
+        client.charge_wallet(wallet.pan, value, descriptor).then(() => {
+            setIsProcessing(false);
+            setWallet(null);
+            barkoder.setPauseDecoding(false);
+        }).catch(err => {
+            setIsProcessing(false);
+            setError(err.toString());
+        });
+    }
+
     return <div id="app">
         <div className="status-bar">
             {!isInitialized ? <h1>Loading...</h1> : (
-                clientState === pretixWallet.State.Initialising ? <h1>Initialising...</h1> :
+                clientState === pretixWallet.State.Initialising ? <h1>Initialising...</h1> : (
                     clientState === pretixWallet.State.NotConfigured ? <>
                         <h1>Not configured</h1>
                         <p>Scan a setup barcode to link to Pretix</p>
-                    </> :
-                        clientState === pretixWallet.State.Ready ? <>
+                    </> : (
+                        clientState === pretixWallet.State.Ready ? (!!wallet ? null : <>
                             <h1>Ready</h1>
                             <p>Scan a ticket barcode</p>
-                        </> : null
+                        </>) : null
+                    )
+                )
             )}
         </div>
-        {(!isInitialized || isProcessing) ? <div className="loading-spinner">
+        {((!isInitialized || isProcessing) && !error) ? <div className="loading-spinner">
             <Spinner animation="border" role="status">
                 <span className="visually-hidden">Loading...</span>
             </Spinner>
@@ -128,5 +150,6 @@ export default function App() {
         </div>
         <Error error={error} onClose={clearError}/>
         <Notice notice={!!notice ? notice.msg : null} title={!!notice ? notice.title : null} onClose={clearNotice}/>
+        <Wallet wallet={wallet} onClose={clearWallet} onValue={chargeWallet}/>
     </div>
 }
