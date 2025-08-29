@@ -3,7 +3,7 @@ import Modal from 'react-bootstrap/Modal';
 import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
 
-export default function Notice(props) {
+export default function Wallet(props) {
     const amountRef = useRef(null);
     const descriptorRef = useRef(null);
 

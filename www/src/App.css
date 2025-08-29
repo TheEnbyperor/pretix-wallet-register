@@ -20,6 +20,7 @@
     align-items: center;
     padding: 20px;
     grid-row: 1;
+    position: relative;
 }
 
 .loading-spinner {
@@ -46,4 +47,112 @@
 
 #cameraPreview, #overlay, #flash-button, #zoom-button, #close-button, #cameraPicker-button {
     z-index: unset !important;
+}
+
+.menu-button-container {
+    display: flex;
+    height: 100%;
+    width: 30px;
+    cursor: pointer;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    position: absolute;
+    right: 30px;
+    top: 0;
+}
+
+#menu-toggle {
+    display: none;
+}
+
+.menu-button,
+.menu-button::before,
+.menu-button::after {
+    display: block;
+    background-color: #fff;
+    position: absolute;
+    height: 4px;
+    width: 30px;
+    transition: transform 400ms cubic-bezier(0.23, 1, 0.32, 1);
+    border-radius: 2px;
+}
+
+.menu-button::before {
+    content: "";
+    margin-top: -8px;
+}
+
+.menu-button::after {
+    content: "";
+    margin-top: 8px;
+}
+
+#menu-toggle:checked + .menu-button-container .menu-button::before {
+    margin-top: 0;
+    transform: rotate(45deg);
+}
+
+#menu-toggle:checked + .menu-button-container .menu-button {
+    background: rgba(255, 255, 255, 0);
+}
+
+#menu-toggle:checked + .menu-button-container .menu-button::after {
+    margin-top: 0;
+    transform: rotate(-45deg);
+}
+
+.menu ul {
+    display: flex;
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    flex-direction: column;
+    width: 100%;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.menu ul > li {
+    display: flex;
+    justify-content: center;
+    margin: 0;
+    padding: 0.5em 0;
+    width: 100%;
+    color: white;
+    background-color: #444;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.menu ul > li:hover {
+    background-color: #555;
+}
+
+.menu ul > li.disabled, .menu ul > li.disabled:hover {
+    background-color: #aaa;
+    cursor: not-allowed;
+}
+
+.menu ul > li:not(:last-child) {
+    border-bottom: 1px solid #444;
+}
+
+#menu-toggle ~ ul li {
+    height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    transition: height 400ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+#menu-toggle:checked ~ ul li {
+    border: 1px solid #333;
+    height: 2.5em;
+    padding: 0.5em;
+    transition: height 400ms cubic-bezier(0.23, 1, 0.32, 1);
 }

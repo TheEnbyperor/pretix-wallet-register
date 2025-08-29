@@ -84,6 +84,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55248b47b0caf0546f7988906588779981c43bb1bc9d0c44087278f80cdb44ba"
 
 [[package]]
+name = "base85"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36915bbaca237c626689b5bd14d02f2ba7a5a359d30a2a08be697392e3718079"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
 name = "binrw"
 version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1294,10 +1303,13 @@ dependencies = [
 name = "pretix-wallet"
 version = "0.1.0"
 dependencies = [
+ "base85",
  "console_error_panic_hook",
  "getrandom 0.2.16",
  "js-sys",
  "log",
+ "rasn",
+ "rasn-compiler",
  "reqwest",
  "serde",
  "serde_json",
@@ -1378,9 +1390,9 @@ dependencies = [
 
 [[package]]
 name = "rasn"
-version = "0.27.0"
+version = "0.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39a1c895be4fdfcf5a9163ef000d3f8918ecb7ebb81ccd03fffef6e37c7080f1"
+checksum = "83235a41e6f6c118df9839b56a87e3a2812a717a3a1b3b1f5afcdd9ef75ce4bf"
 dependencies = [
  "bitvec",
  "bitvec-nom2",
@@ -1401,9 +1413,7 @@ dependencies = [
 
 [[package]]
 name = "rasn-compiler"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b074fb8880bbc9cfb1a4513c1fa1996709c4c33898945c7755112a96077233c"
+version = "0.14.2"
 dependencies = [
  "chrono",
  "nom 8.0.0",
@@ -1881,6 +1891,26 @@ dependencies = [
  "once_cell",
  "rustix",
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "thiserror"
+version = "1.0.69"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52"
+dependencies = [
+ "thiserror-impl",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "1.0.69"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

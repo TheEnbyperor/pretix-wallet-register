@@ -6,6 +6,8 @@ import Error from './Error';
 import Notice from './Notice';
 import Wallet from './Wallet';
 import "./App.css";
+import VASRegister from "./VASRegister";
+import VASDeviceSelect from "./VASDeviceSelect";
 
 const BARKODER_LICENSE = "0MHXR8cuvoJT62F-vUCcqMQR74K0988ixUjSf_DnucZlrv_DJTneGfAh1avJBr72P0VecEQGK5JHDH0FmfI_Lp8PdEdFGLDlQzT_axGBusQQWRt4-vYYaAyxrCvqtGWZIVN6jhCiyvQ7fndQ7oDAwhdpufGp1KH2tYFeNfif84DE8anuMEXfTOGUjN3jfEu1";
 
@@ -18,6 +20,11 @@ export default function App() {
     const [clientState, setClientState] = useState(null);
     const [barkoder, setBarkoder] = useState(null);
     const [client, setClient] = useState(null);
+    const [vasRegisterOpen, setVasRegisterOpen] = useState(false);
+    const [vasDeviceSelectOpen, setVasDeviceSelectOpen] = useState(false);
+    const [vasWs, setVasWS] = useState(null);
+    const [vasDevices, setVasDevices] = useState([]);
+    const [vasDeviceId, setVasDeviceId] = useState(null);
 
     useEffect(() => {
         const initializeBarkoder = async () => {
@@ -62,6 +69,12 @@ export default function App() {
     }, []);
 
     useEffect(() => {
+        if (clientState === pretixWallet.State.Ready) {
+            startVASWebSocket();
+        }
+    }, [clientState]);
+
+    useEffect(() => {
         if (barkoder && client) {
             barkoder.startScanner((result) => {
                 if (result.error) {
@@ -70,22 +83,7 @@ export default function App() {
                     setIsProcessing(true);
                     client.barcode_scanned(result.binaryData).then((res) => {
                         setIsProcessing(false);
-                        if (res.action === pretixWallet.ScanAction.Registered) {
-                            setNotice({
-                                title: "Registered",
-                                msg: "This device has been successfully registered with Pretix"
-                            })
-                        } else if (res.action === pretixWallet.ScanAction.Wallet) {
-                            setWallet({
-                                pan: res.wallet_pan,
-                                public_pan: res.wallet_public_pan,
-                                balance: res.wallet_balance,
-                                currency: res.wallet_currency,
-                                customer: res.wallet_customer
-                            })
-                        } else {
-                            barkoder.setPauseDecoding(false);
-                        }
+                        processScanResult(res);
                     }).catch(err => {
                         setIsProcessing(false);
                         setError(err.toString());
@@ -95,22 +93,42 @@ export default function App() {
         }
     }, [barkoder, clientState]);
 
-    const clearError = () => {
-        if (isInitialized) {
-            setError(null);
+    const processScanResult = (res) => {
+        if (res.action === pretixWallet.ScanAction.Registered) {
+            setNotice({
+                title: "Registered",
+                msg: "This device has been successfully registered with Pretix"
+            })
+        } else if (res.action === pretixWallet.ScanAction.Wallet) {
+            setWallet({
+                pan: res.wallet_pan,
+                public_pan: res.wallet_public_pan,
+                balance: res.wallet_balance,
+                currency: res.wallet_currency,
+                customer: res.wallet_customer
+            })
+        } else {
             barkoder.setPauseDecoding(false);
         }
     }
 
+    const clearError = () => {
+        if (isInitialized) {
+            setError(null);
+            barkoder.setPauseDecoding(false);
+            startVASWebSocket();
+        }
+    };
+
     const clearNotice = () => {
         setNotice(null);
         barkoder.setPauseDecoding(false);
-    }
+    };
 
     const clearWallet = () => {
         setWallet(null);
         barkoder.setPauseDecoding(false);
-    }
+    };
 
     const chargeWallet = (value, descriptor) => {
         setIsProcessing(true);
@@ -122,6 +140,88 @@ export default function App() {
             setIsProcessing(false);
             setError(err.toString());
         });
+    };
+
+    const registerVAS = (server, token) => {
+        setVasRegisterOpen(false);
+        setIsProcessing(true);
+        client.link_vas_device(server, token).then(() => {
+            setIsProcessing(false);
+            setNotice({
+                title: "Registered",
+                msg: "This device has been successfully registered with Tappybara"
+            });
+            startVASWebSocket();
+        }).catch(err => {
+            setIsProcessing(false);
+            setError(err.toString());
+        });
+    };
+
+    const startVASWebSocket = () => {
+        if (vasWs) {
+            return;
+        }
+        client.get_vas_connection().then((reg) => {
+            if (!reg) {
+                return;
+            }
+            const socket = new WebSocket(reg.url);
+            socket.addEventListener("open", () => {
+                socket.send(JSON.stringify({
+                    command: "login",
+                    token: reg.token,
+                }));
+                socket.send(JSON.stringify({
+                    command: "get_device"
+                }));
+                if (!!vasDeviceId) {
+                    socket.send(JSON.stringify({
+                        command: "bind_device",
+                        id: vasDeviceId
+                    }));
+                }
+            });
+            socket.addEventListener("close", onVASClose);
+            socket.addEventListener("message", onVASMessage);
+            setVasWS(socket);
+        }).catch((err) => {
+            setError(err.toString());
+        });
+    };
+
+    const onVASClose = () => {
+        setVasWS(null);
+        setTimeout(startVASWebSocket, 1000);
+    };
+
+    const onVASMessage = (message) => {
+        const data = JSON.parse(message.data);
+        console.log(data);
+        if (data.response === "devices") {
+            setVasDevices(data.devices);
+        } else if (data.response === "tap_redemption") {
+            setIsProcessing(true);
+            barkoder.setPauseDecoding(true);
+            client.tap_redemption(data.data).then((res) => {
+                setIsProcessing(false);
+                processScanResult(res);
+            }).catch(err => {
+                setIsProcessing(false);
+                setError(err.toString());
+            });
+        }
+    };
+
+    const setVASDevice = (device_id) => {
+        if (!!vasWs) {
+            vasWs.send(JSON.stringify({
+                command: "bind_device",
+                id: device_id
+            }));
+            setVasDeviceSelectOpen(false);
+            setVasDeviceId(device_id);
+        }
     }
 
     return <div id="app">
@@ -135,6 +235,20 @@ export default function App() {
                         clientState === pretixWallet.State.Ready ? (!!wallet ? null : <>
                             <h1>Ready</h1>
                             <p>Scan a ticket barcode</p>
+                            <div className="menu">
+                                <input id="menu-toggle" type="checkbox"/>
+                                <label className="menu-button-container" htmlFor="menu-toggle">
+                                    <div className="menu-button"></div>
+                                </label>
+                                <ul>
+                                    <li onClick={() => setVasRegisterOpen(true)}>Register to Tappybara</li>
+                                    <li onClick={() => {
+                                        if (!!vasDevices.length) {
+                                            setVasDeviceSelectOpen(true);
+                                        }
+                                    }} className={!!vasDevices.length ? "" : "disabled"}>Select Tappybara device</li>
+                                </ul>
+                            </div>
                         </>) : null
                     )
                 )
@@ -151,5 +265,7 @@ export default function App() {
         <Error error={error} onClose={clearError}/>
         <Notice notice={!!notice ? notice.msg : null} title={!!notice ? notice.title : null} onClose={clearNotice}/>
         <Wallet wallet={wallet} onClose={clearWallet} onValue={chargeWallet}/>
+        <VASRegister open={vasRegisterOpen} onClose={() => setVasRegisterOpen(false)} onValue={registerVAS} />
+        <VASDeviceSelect devices={vasDevices} selectedDeviceId={vasDeviceId} open={vasDeviceSelectOpen} onClose={() => setVasDeviceSelectOpen(false)} onSelect={setVASDevice} />
     </div>
 }
